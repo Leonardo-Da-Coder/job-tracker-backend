@@ -1,12 +1,16 @@
-from pydantic import BaseModel
-from models import StatusEnum
 from datetime import date
 
-class ApplicationCreate(BaseModel):
-    company:str
+from pydantic import BaseModel
+
+from models import StatusEnum
+
+
+class Application(BaseModel):
+    id: int | None = None
+    company: str
     position: str
     state: StatusEnum
     applied_at: date
 
-class Application(ApplicationCreate):
-    id: int
+    class Config:
+        from_attributes = True
