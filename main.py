@@ -1,5 +1,6 @@
 from fastapi import FastAPI , status, HTTPException
 from pydantic import BaseModel
+import database
 
 class Application(BaseModel):
     firma: str
