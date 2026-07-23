@@ -1,42 +1,50 @@
-from fastapi import FastAPI , status, HTTPException
+from typing import Annotated
+
+from fastapi import Depends, FastAPI, HTTPException, status
 from pydantic import BaseModel
-import database
+from sqlalchemy.orm import Session
 
-class Application(BaseModel):
-    firma: str
-    position: str
-    status: str
-    datum: str
-
-applications = [
-    Application(firma="DSV", position="Fullstack Entwickler", status="beworben", datum="20.07.2026"),
-    Application(firma="hiqs", position="Junior Go Developer", status="beworben", datum="20.07.2026"),
-    Application(firma="BAUHAUS", position="Junior Softwareentwickler", status="beworben", datum="20.07.2026"),
-]
+import models
+from database import get_db
+from schemas import Application
 
 app = FastAPI()
+DbSession = Annotated[Session,Depends(get_db)]
 
-@app.get("/applications")
-def read_applications():
-    return applications
+@app.get("/applications", response_model=list[Application])
+def read_applications(db: DbSession):
+    return db.query(models.Application).all()
 
-@app.post("/applications", status_code=status.HTTP_201_CREATED)
-def add_application(application: Application):
-    applications.append(application)
+
+@app.post("/applications", status_code=status.HTTP_201_CREATED, response_model=Application)
+def add_application(application: Application, db: DbSession):
+    db_application = models.Application(**application.model_dump())
+    db.add(db_application)
+    db.commit()
+    db.refresh(db_application)
+    return db_application
+
+
+@app.delete("/applications/{id}")
+def delete_application(id: int, db: DbSession):
+    application = find_application(id, db)
+    db.delete(application)
+    db.commit()
+
+
+@app.patch("/applications/{id}", response_model=Application)
+def update_status(id: int, newState: models.StatusEnum, db: DbSession):
+    application = find_application(id, db)
+    application.state = newState  # type: ignore
+    db.commit()
+    db.refresh(application)
     return application
 
-@app.delete("/applications/{firma}", status_code=status.HTTP_200_OK)
-def delete_application(firma:str):
-    application = find_application(firma)
-    applications.remove(application)
 
-@app.patch("/applications/{firma}")
-def update_status(firma:str , status:str):
-    application = find_application(firma)
-    application.status = status
-
-def find_application(firma:str):
-    application = next((a for a in applications if a.firma == firma ), None)
+def find_application(id: int, db: Session):
+    application = (
+        db.query(models.Application).filter(models.Application.id == id).first()
+    )
     if not application:
         raise HTTPException(status_code=404, detail="Application not Found")
     return application
