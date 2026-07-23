@@ -1,7 +1,7 @@
 from typing import Annotated
 
 from fastapi import Depends, FastAPI, HTTPException, status
-from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 
 import models
@@ -9,14 +9,24 @@ from database import get_db
 from schemas import Application
 
 app = FastAPI()
-DbSession = Annotated[Session,Depends(get_db)]
+DbSession = Annotated[Session, Depends(get_db)]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:4200"],
+    allow_methods=["*"],
+    allow_headers=["*"]
+)
+
 
 @app.get("/applications", response_model=list[Application])
 def read_applications(db: DbSession):
     return db.query(models.Application).all()
 
 
-@app.post("/applications", status_code=status.HTTP_201_CREATED, response_model=Application)
+@app.post(
+    "/applications", status_code=status.HTTP_201_CREATED, response_model=Application
+)
 def add_application(application: Application, db: DbSession):
     db_application = models.Application(**application.model_dump())
     db.add(db_application)
